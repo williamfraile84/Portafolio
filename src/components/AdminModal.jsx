@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  Lock, Unlock, KeyRound, Eye, EyeOff, Save, Download, Copy, RotateCcw, 
-  X, Check, AlertTriangle, ShieldCheck, Github, Sliders, User, RefreshCw, Plus, Trash2, Mail, MessageCircle, Linkedin,
-  Globe, Send, ExternalLink, Loader2, Key
+  Lock, Eye, EyeOff, Save, Download, Copy, RotateCcw, 
+  X, Check, AlertTriangle, ShieldCheck, Github, Sliders, User, Plus, Trash2, Mail, MessageCircle, Linkedin,
+  Globe, Send, ExternalLink, Loader2, Key, ChevronUp, ChevronDown, Edit3, Star, Sparkles, Image, Layers
 } from 'lucide-react';
 import { isAuthenticated, login, logout, changePassword } from '../services/authService';
 import { saveActiveConfig, resetConfigToDefaults, downloadConfigFile, generateConfigCode } from '../services/configService';
@@ -16,7 +16,7 @@ export default function AdminModal({ isOpen, onClose, activeConfig, onConfigUpda
   const [loginLoading, setLoginLoading] = useState(false);
 
   // Tab State
-  const [activeTab, setActiveTab] = useState('projects'); // 'projects' | 'github' | 'profile' | 'security' | 'export'
+  const [activeTab, setActiveTab] = useState('projects'); // 'projects' | 'github' | 'profile' | 'export' | 'security'
   
   // Local Config Draft
   const [configDraft, setConfigDraft] = useState(activeConfig);
@@ -30,6 +30,25 @@ export default function AdminModal({ isOpen, onClose, activeConfig, onConfigUpda
   const [isPublishing, setIsPublishing] = useState(false);
   const [publishFeedback, setPublishFeedback] = useState(null);
 
+  // Project Editor State
+  const [editingProjectId, setEditingProjectId] = useState(null); // null | 'new' | string ID
+  const [projectForm, setProjectForm] = useState({
+    id: '',
+    title: '',
+    category: 'fullstack',
+    categoryLabel: '🛒 Full Stack Web & PWA',
+    repoUrl: '',
+    companionRepoUrl: '',
+    companionRepoLabel: '',
+    liveUrl: '',
+    description: '',
+    techStackText: '',
+    architectureText: '',
+    thumbnail: '',
+    visible: true,
+    gallery: []
+  });
+
   useEffect(() => {
     if (isOpen) {
       setAuthed(isAuthenticated());
@@ -38,6 +57,7 @@ export default function AdminModal({ isOpen, onClose, activeConfig, onConfigUpda
       setLoginError('');
       setStatusMsg({ text: '', type: '' });
       setPublishFeedback(null);
+      setEditingProjectId(null);
       setGithubToken(getSavedGitHubToken());
     }
   }, [isOpen, activeConfig]);
@@ -84,9 +104,9 @@ export default function AdminModal({ isOpen, onClose, activeConfig, onConfigUpda
       const hiddenList = [...(prev.github.hiddenRepos || [])];
       const index = hiddenList.findIndex((r) => r.toLowerCase() === repoName.toLowerCase());
       if (index >= 0) {
-        hiddenList.splice(index, 1); // Quitar de ocultos (hacerlo visible)
+        hiddenList.splice(index, 1);
       } else {
-        hiddenList.push(repoName); // Agregar a ocultos
+        hiddenList.push(repoName);
       }
       return {
         ...prev,
@@ -98,16 +118,174 @@ export default function AdminModal({ isOpen, onClose, activeConfig, onConfigUpda
     });
   };
 
-  // Guardar en navegador (localStorage) y notificar al estado reactivo principal
-  const handleSaveToBrowser = () => {
-    const res = saveActiveConfig(configDraft);
-    if (res.success) {
-      onConfigUpdated(configDraft);
-      setStatusMsg({ text: '¡Configuración guardada en este navegador con éxito!', type: 'success' });
-      setTimeout(() => setStatusMsg({ text: '', type: '' }), 4000);
-    } else {
-      setStatusMsg({ text: 'Error al guardar en el navegador: ' + res.error, type: 'error' });
+  // Iniciar edición de proyecto existente
+  const handleStartEditProject = (proj) => {
+    setEditingProjectId(proj.id);
+    setProjectForm({
+      id: proj.id,
+      title: proj.title || '',
+      category: proj.category || 'fullstack',
+      categoryLabel: proj.categoryLabel || '🛒 Full Stack Web & PWA',
+      repoUrl: proj.repoUrl || '',
+      companionRepoUrl: proj.companionRepoUrl || '',
+      companionRepoLabel: proj.companionRepoLabel || '',
+      liveUrl: proj.liveUrl || '',
+      description: proj.description || '',
+      techStackText: Array.isArray(proj.techStack) ? proj.techStack.join(', ') : '',
+      architectureText: Array.isArray(proj.architecture) ? proj.architecture.join('\n') : '',
+      thumbnail: proj.thumbnail || '',
+      visible: proj.visible !== false,
+      gallery: proj.gallery || []
+    });
+  };
+
+  // Iniciar creación de nuevo proyecto (opcionalmente precargado desde un repo de GitHub)
+  const handleStartNewProject = (prefillRepo = null) => {
+    const defaultTitle = prefillRepo ? prefillRepo.name : '';
+    const defaultRepoUrl = prefillRepo 
+      ? (prefillRepo.html_url || `https://github.com/williamfraile84/${prefillRepo.name}`)
+      : 'https://github.com/williamfraile84/';
+    const defaultDesc = prefillRepo 
+      ? (prefillRepo.description || 'Proyecto de software desarrollado con buenas prácticas y arquitectura escalable.')
+      : '';
+    const defaultTech = prefillRepo?.language ? prefillRepo.language : 'JavaScript, React';
+
+    setEditingProjectId('new');
+    setProjectForm({
+      id: prefillRepo ? prefillRepo.name.toLowerCase().replace(/[^a-z0-9]/g, '-') : 'proyecto-' + Date.now().toString(36),
+      title: defaultTitle,
+      category: 'fullstack',
+      categoryLabel: '🛒 Full Stack Web & PWA',
+      repoUrl: defaultRepoUrl,
+      companionRepoUrl: '',
+      companionRepoLabel: '',
+      liveUrl: '',
+      description: defaultDesc,
+      techStackText: defaultTech,
+      architectureText: '• Arquitectura desacoplada y orientada a componentes\n• Manejo estructurado de estado y datos\n• Optimización de rendimiento y buenas prácticas',
+      thumbnail: 'https://images.unsplash.com/photo-1555066931-4365d14bab8c?w=800&auto=format&fit=crop&q=80',
+      visible: true,
+      gallery: []
+    });
+  };
+
+  // Cancelar edición de proyecto
+  const handleCancelProjectEdit = () => {
+    setEditingProjectId(null);
+  };
+
+  // Cambiar categoría y actualizar etiqueta automáticamente
+  const handleCategoryChange = (cat) => {
+    const labels = {
+      fullstack: '🛒 Full Stack Web & PWA',
+      backend: '⚡ Backend API & Microservicios',
+      hardware: '⚖️ Hardware & Automatización',
+      auditoria: '🛡️ Auditoría Forense & OWASP',
+      mobile: '📱 Mobile Nativo & OCR'
+    };
+    setProjectForm((prev) => ({
+      ...prev,
+      category: cat,
+      categoryLabel: labels[cat] || prev.categoryLabel
+    }));
+  };
+
+  // Autocompletar formulario al seleccionar un repo existente de GitHub
+  const handleSelectRepoToPrefill = (repoName) => {
+    if (!repoName) return;
+    const found = liveRepos.find((r) => r.name.toLowerCase() === repoName.toLowerCase());
+    if (found) {
+      setProjectForm((prev) => ({
+        ...prev,
+        title: found.name,
+        repoUrl: found.html_url || `https://github.com/williamfraile84/${found.name}`,
+        description: found.description || prev.description,
+        techStackText: found.language ? `${found.language}, Git` : prev.techStackText
+      }));
     }
+  };
+
+  // Guardar proyecto creado o editado
+  const handleSaveProjectForm = (e) => {
+    e.preventDefault();
+    if (!projectForm.title || !projectForm.title.trim()) {
+      setStatusMsg({ text: 'El título del proyecto es obligatorio.', type: 'error' });
+      return;
+    }
+    if (!projectForm.repoUrl || !projectForm.repoUrl.trim()) {
+      setStatusMsg({ text: 'La URL del repositorio es obligatoria.', type: 'error' });
+      return;
+    }
+
+    const techArray = projectForm.techStackText
+      ? projectForm.techStackText.split(',').map(s => s.trim()).filter(Boolean)
+      : ['Software'];
+
+    const archArray = projectForm.architectureText
+      ? projectForm.architectureText.split('\n').map(s => s.trim()).filter(Boolean)
+      : [];
+
+    const projectToSave = {
+      id: projectForm.id || ('proj-' + Date.now().toString(36)),
+      title: projectForm.title.trim(),
+      category: projectForm.category || 'fullstack',
+      categoryLabel: projectForm.categoryLabel || '⚡ Software',
+      repoUrl: projectForm.repoUrl.trim(),
+      companionRepoUrl: projectForm.companionRepoUrl ? projectForm.companionRepoUrl.trim() : null,
+      companionRepoLabel: projectForm.companionRepoLabel ? projectForm.companionRepoLabel.trim() : null,
+      liveUrl: projectForm.liveUrl ? projectForm.liveUrl.trim() : null,
+      description: projectForm.description.trim(),
+      techStack: techArray,
+      architecture: archArray,
+      thumbnail: projectForm.thumbnail || 'https://images.unsplash.com/photo-1555066931-4365d14bab8c?w=800&auto=format&fit=crop&q=80',
+      visible: projectForm.visible !== false,
+      gallery: projectForm.gallery && projectForm.gallery.length > 0 
+        ? projectForm.gallery 
+        : [{ url: projectForm.thumbnail, caption: projectForm.title }]
+    };
+
+    setConfigDraft((prev) => {
+      let updatedList = [...prev.featuredProjects];
+      if (editingProjectId === 'new') {
+        updatedList.push(projectToSave);
+      } else {
+        updatedList = updatedList.map((p) => (p.id === editingProjectId ? projectToSave : p));
+      }
+      return { ...prev, featuredProjects: updatedList };
+    });
+
+    setEditingProjectId(null);
+    setStatusMsg({ 
+      text: editingProjectId === 'new' ? '¡Proyecto agregado! Pulsa "Publicar Globalmente" para subirlo a GitHub.' : '¡Proyecto actualizado! Pulsa "Publicar Globalmente" para subirlo a GitHub.', 
+      type: 'success' 
+    });
+    setTimeout(() => setStatusMsg({ text: '', type: '' }), 5000);
+  };
+
+  // Eliminar proyecto destacado
+  const handleDeleteProject = (projId) => {
+    if (window.confirm("¿Seguro que deseas quitar este proyecto de la lista de Proyectos Destacados?")) {
+      setConfigDraft((prev) => ({
+        ...prev,
+        featuredProjects: prev.featuredProjects.filter(p => p.id !== projId)
+      }));
+      setStatusMsg({ text: 'Proyecto quitado de los destacados.', type: 'success' });
+      setTimeout(() => setStatusMsg({ text: '', type: '' }), 3000);
+    }
+  };
+
+  // Reordenar proyectos (subir/bajar)
+  const handleMoveProject = (index, direction) => {
+    const targetIndex = index + direction;
+    if (targetIndex < 0 || targetIndex >= configDraft.featuredProjects.length) return;
+
+    setConfigDraft((prev) => {
+      const list = [...prev.featuredProjects];
+      const temp = list[index];
+      list[index] = list[targetIndex];
+      list[targetIndex] = temp;
+      return { ...prev, featuredProjects: list };
+    });
   };
 
   // Publicar directamente en GitHub Pages para todo el mundo
@@ -116,7 +294,7 @@ export default function AdminModal({ isOpen, onClose, activeConfig, onConfigUpda
       setActiveTab('export');
       setPublishFeedback({
         success: false,
-        message: 'Ingresa tu Personal Access Token (PAT) de GitHub para poder publicar a nivel global.'
+        message: 'Por favor ingresa tu Personal Access Token (PAT) de GitHub para poder publicar a nivel global.'
       });
       return;
     }
@@ -124,11 +302,11 @@ export default function AdminModal({ isOpen, onClose, activeConfig, onConfigUpda
     setIsPublishing(true);
     setPublishFeedback(null);
 
-    // 1. Guardar primero en local
+    // Guardar cambios localmente en el draft
     saveActiveConfig(configDraft);
     onConfigUpdated(configDraft);
 
-    // 2. Publicar en GitHub
+    // Enviar a la API de GitHub
     const res = await publishConfigToGitHub(configDraft, githubToken);
     setIsPublishing(false);
     setPublishFeedback(res);
@@ -321,7 +499,7 @@ export default function AdminModal({ isOpen, onClose, activeConfig, onConfigUpda
             {/* Navigation Tabs */}
             <div className="flex items-center gap-2 px-6 pt-3 border-b border-slate-800 overflow-x-auto bg-slate-900">
               <button
-                onClick={() => setActiveTab('projects')}
+                onClick={() => { setActiveTab('projects'); setEditingProjectId(null); }}
                 className={`px-4 py-2 text-xs font-semibold rounded-t-xl transition-all ${
                   activeTab === 'projects'
                     ? 'bg-slate-800 text-cyan-400 border-t-2 border-cyan-400'
@@ -375,67 +553,342 @@ export default function AdminModal({ isOpen, onClose, activeConfig, onConfigUpda
             {/* Tab Contents (Scrollable) */}
             <div className="p-6 overflow-y-auto flex-grow space-y-6">
               
-              {/* TAB 1: PROYECTOS DESTACADOS */}
+              {/* ========================================================= */}
+              {/* TAB 1: GESTIÓN DE PROYECTOS DESTACADOS                     */}
+              {/* ========================================================= */}
               {activeTab === 'projects' && (
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between mb-2">
-                    <div>
-                      <h4 className="text-sm font-bold text-white">Activar / Desactivar Proyectos Principales</h4>
-                      <p className="text-xs text-slate-400">Los proyectos apagados no se mostrarán en la página a los visitantes.</p>
-                    </div>
-                  </div>
-
-                  <div className="space-y-3">
-                    {configDraft.featuredProjects.map((proj) => {
-                      const isVisible = proj.visible !== false;
-                      return (
-                        <div
-                          key={proj.id}
-                          className={`p-4 rounded-2xl border transition-all flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 ${
-                            isVisible ? 'bg-slate-950/80 border-slate-800' : 'bg-slate-950/30 border-slate-900 opacity-60'
-                          }`}
+                <div className="space-y-5">
+                  
+                  {/* Vista A: Formulario de Edición / Creación */}
+                  {editingProjectId !== null ? (
+                    <form onSubmit={handleSaveProjectForm} className="p-5 rounded-2xl bg-slate-950 border border-cyan-500/30 space-y-4">
+                      <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+                        <div className="flex items-center gap-2">
+                          <Edit3 className="w-4 h-4 text-cyan-400" />
+                          <h4 className="text-sm font-bold text-white">
+                            {editingProjectId === 'new' ? 'Agregar Nuevo Proyecto Destacado' : `Editar Proyecto: ${projectForm.title}`}
+                          </h4>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={handleCancelProjectEdit}
+                          className="text-xs text-slate-400 hover:text-white"
                         >
-                          <div className="flex items-center gap-3">
-                            <img
-                              src={proj.thumbnail}
-                              alt=""
-                              className="w-14 h-10 rounded-lg object-cover border border-slate-800 flex-shrink-0"
-                            />
-                            <div>
-                              <div className="flex items-center gap-2">
-                                <span className="font-bold text-sm text-white">{proj.title}</span>
-                                <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-800 text-cyan-400">
-                                  {proj.categoryLabel}
-                                </span>
-                              </div>
-                              <p className="text-xs text-slate-400 line-clamp-1">{proj.description}</p>
-                            </div>
-                          </div>
+                          Cancelar
+                        </button>
+                      </div>
 
-                          <div className="flex items-center gap-3 self-end sm:self-center">
-                            <span className={`text-xs font-mono font-semibold ${isVisible ? 'text-emerald-400' : 'text-slate-500'}`}>
-                              {isVisible ? 'Visible' : 'Oculto'}
+                      {/* Selector para autocompletar desde GitHub */}
+                      {editingProjectId === 'new' && (
+                        <div className="p-3 rounded-xl bg-slate-900 border border-slate-800">
+                          <label className="text-[11px] font-bold text-slate-300 block mb-1">
+                            🚀 Autocompletar desde un repositorio existente de GitHub:
+                          </label>
+                          <select
+                            onChange={(e) => handleSelectRepoToPrefill(e.target.value)}
+                            className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-cyan-300 focus:outline-none"
+                            defaultValue=""
+                          >
+                            <option value="">-- Elige un repositorio de GitHub para cargar sus datos --</option>
+                            {liveRepos.map((r) => (
+                              <option key={r.name} value={r.name}>
+                                {r.name} ({r.language || 'Sin lenguaje'})
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      )}
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        {/* Título */}
+                        <div>
+                          <label className="text-xs font-bold text-slate-300 block mb-1">Título del Proyecto *</label>
+                          <input
+                            type="text"
+                            required
+                            value={projectForm.title}
+                            onChange={(e) => setProjectForm(prev => ({ ...prev, title: e.target.value }))}
+                            className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-cyan-500"
+                            placeholder="Ej: FRUVER POS – Ecosistema Web"
+                          />
+                        </div>
+
+                        {/* Categoría */}
+                        <div>
+                          <label className="text-xs font-bold text-slate-300 block mb-1">Categoría Principal</label>
+                          <select
+                            value={projectForm.category}
+                            onChange={(e) => handleCategoryChange(e.target.value)}
+                            className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-cyan-500"
+                          >
+                            <option value="fullstack">🛒 Full Stack Web & PWA</option>
+                            <option value="backend">⚡ Backend API & Microservicios</option>
+                            <option value="hardware">⚖️ Hardware & Automatización</option>
+                            <option value="auditoria">🛡️ Auditoría Forense & OWASP</option>
+                            <option value="mobile">📱 Mobile Nativo & OCR</option>
+                          </select>
+                        </div>
+
+                        {/* Etiqueta visible */}
+                        <div>
+                          <label className="text-xs font-bold text-slate-300 block mb-1">Insignia / Etiqueta Visible</label>
+                          <input
+                            type="text"
+                            value={projectForm.categoryLabel}
+                            onChange={(e) => setProjectForm(prev => ({ ...prev, categoryLabel: e.target.value }))}
+                            className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-cyan-500 font-mono"
+                            placeholder="🛒 Full Stack Web & PWA"
+                          />
+                        </div>
+
+                        {/* URL del Repositorio Principal */}
+                        <div>
+                          <label className="text-xs font-bold text-slate-300 block mb-1">URL Repositorio Principal (GitHub) *</label>
+                          <input
+                            type="url"
+                            required
+                            value={projectForm.repoUrl}
+                            onChange={(e) => setProjectForm(prev => ({ ...prev, repoUrl: e.target.value }))}
+                            className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-cyan-500 font-mono"
+                            placeholder="https://github.com/williamfraile84/..."
+                          />
+                        </div>
+
+                        {/* Repositorio Compañero (Opcional) */}
+                        <div>
+                          <label className="text-xs font-bold text-slate-300 block mb-1">URL Repositorio Compañero (Opcional)</label>
+                          <input
+                            type="url"
+                            value={projectForm.companionRepoUrl}
+                            onChange={(e) => setProjectForm(prev => ({ ...prev, companionRepoUrl: e.target.value }))}
+                            className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-cyan-500 font-mono"
+                            placeholder="https://github.com/williamfraile84/Backend-..."
+                          />
+                        </div>
+
+                        {/* Etiqueta Compañero */}
+                        <div>
+                          <label className="text-xs font-bold text-slate-300 block mb-1">Etiqueta Repo Compañero</label>
+                          <input
+                            type="text"
+                            value={projectForm.companionRepoLabel}
+                            onChange={(e) => setProjectForm(prev => ({ ...prev, companionRepoLabel: e.target.value }))}
+                            className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-cyan-500 font-mono"
+                            placeholder="Backend API / Frontend SPA"
+                          />
+                        </div>
+
+                        {/* URL Demo Externa */}
+                        <div>
+                          <label className="text-xs font-bold text-slate-300 block mb-1">URL Demo en Vivo (Opcional)</label>
+                          <input
+                            type="url"
+                            value={projectForm.liveUrl}
+                            onChange={(e) => setProjectForm(prev => ({ ...prev, liveUrl: e.target.value }))}
+                            className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-cyan-500 font-mono"
+                            placeholder="Dejar vacío si no aplica"
+                          />
+                        </div>
+
+                        {/* Miniatura / Thumbnail */}
+                        <div>
+                          <label className="text-xs font-bold text-slate-300 block mb-1">URL Imagen de Portada / Miniatura</label>
+                          <input
+                            type="url"
+                            value={projectForm.thumbnail}
+                            onChange={(e) => setProjectForm(prev => ({ ...prev, thumbnail: e.target.value }))}
+                            className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-cyan-500 font-mono"
+                            placeholder="https://raw.githubusercontent.com/.../screenshot.png"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Descripción */}
+                      <div>
+                        <label className="text-xs font-bold text-slate-300 block mb-1">Descripción del Proyecto</label>
+                        <textarea
+                          rows="3"
+                          value={projectForm.description}
+                          onChange={(e) => setProjectForm(prev => ({ ...prev, description: e.target.value }))}
+                          className="w-full bg-slate-900 border border-slate-800 rounded-xl p-3 text-xs text-white leading-relaxed focus:outline-none focus:border-cyan-500"
+                          placeholder="Explica qué problema resuelve, arquitectura utilizada y logros técnicos..."
+                        />
+                      </div>
+
+                      {/* Tecnologías */}
+                      <div>
+                        <label className="text-xs font-bold text-slate-300 block mb-1">
+                          Stack Tecnológico (Separado por comas)
+                        </label>
+                        <input
+                          type="text"
+                          value={projectForm.techStackText}
+                          onChange={(e) => setProjectForm(prev => ({ ...prev, techStackText: e.target.value }))}
+                          className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-cyan-500 font-mono"
+                          placeholder="React 19, FastAPI, PostgreSQL, Docker, Pytest"
+                        />
+                      </div>
+
+                      {/* Puntos de Arquitectura */}
+                      <div>
+                        <label className="text-xs font-bold text-slate-300 block mb-1">
+                          Puntos Clave de Arquitectura (Un punto por línea)
+                        </label>
+                        <textarea
+                          rows="3"
+                          value={projectForm.architectureText}
+                          onChange={(e) => setProjectForm(prev => ({ ...prev, architectureText: e.target.value }))}
+                          className="w-full bg-slate-900 border border-slate-800 rounded-xl p-3 text-xs text-white leading-relaxed font-mono focus:outline-none focus:border-cyan-500"
+                          placeholder="• Arquitectura ASGI asíncrona no bloqueante&#10;• Persistencia dual con SQLite WAL&#10;• Suite automatizada de pruebas"
+                        />
+                      </div>
+
+                      <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-800">
+                        <button
+                          type="button"
+                          onClick={handleCancelProjectEdit}
+                          className="px-4 py-2 rounded-xl bg-slate-800 text-slate-300 text-xs font-semibold hover:bg-slate-700"
+                        >
+                          Cancelar
+                        </button>
+                        <button
+                          type="submit"
+                          className="px-5 py-2 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 text-white font-semibold text-xs shadow-lg shadow-cyan-500/20 hover:scale-102"
+                        >
+                          Guardar Proyecto en Lista
+                        </button>
+                      </div>
+                    </form>
+                  ) : (
+                    /* Vista B: Lista de Proyectos Destacados */
+                    <>
+                      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-4 rounded-2xl bg-cyan-950/20 border border-cyan-800/40">
+                        <div>
+                          <h4 className="text-sm font-bold text-white flex items-center gap-2">
+                            <span>Proyectos Principales / Destacados</span>
+                            <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-cyan-950 border border-cyan-800 text-cyan-300">
+                              {configDraft.featuredProjects.length} proyectos
                             </span>
-                            <button
-                              type="button"
-                              onClick={() => handleToggleProject(proj.id)}
-                              className={`w-12 h-6 rounded-full transition-colors relative focus:outline-none ${
-                                isVisible ? 'bg-emerald-500' : 'bg-slate-800'
+                          </h4>
+                          <p className="text-xs text-slate-400">
+                            Puedes editar los textos, cambiar enlaces, reordenar prioridades o agregar nuevos proyectos.
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => handleStartNewProject()}
+                          className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-semibold text-xs shadow-md shadow-cyan-500/20 transition-all flex-shrink-0"
+                        >
+                          <Plus className="w-4 h-4" />
+                          <span>Agregar Proyecto</span>
+                        </button>
+                      </div>
+
+                      <div className="space-y-3">
+                        {configDraft.featuredProjects.map((proj, idx) => {
+                          const isVisible = proj.visible !== false;
+                          return (
+                            <div
+                              key={proj.id || idx}
+                              className={`p-4 rounded-2xl border transition-all flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 ${
+                                isVisible ? 'bg-slate-950/80 border-slate-800' : 'bg-slate-950/30 border-slate-900 opacity-60'
                               }`}
                             >
-                              <div className={`w-5 h-5 rounded-full bg-white transition-transform ${
-                                isVisible ? 'translate-x-6.5' : 'translate-x-0.5'
-                              }`} />
-                            </button>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
+                              <div className="flex items-center gap-3 min-w-0 flex-grow">
+                                <img
+                                  src={proj.thumbnail}
+                                  alt=""
+                                  className="w-16 h-12 rounded-lg object-cover border border-slate-800 flex-shrink-0"
+                                />
+                                <div className="min-w-0">
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    <span className="font-bold text-sm text-white truncate">{proj.title}</span>
+                                    <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-800 text-cyan-400 flex-shrink-0">
+                                      {proj.categoryLabel}
+                                    </span>
+                                  </div>
+                                  <p className="text-xs text-slate-400 line-clamp-1 mt-0.5">{proj.description}</p>
+                                  <div className="text-[11px] font-mono text-slate-500 truncate mt-1">
+                                    {proj.repoUrl}
+                                  </div>
+                                </div>
+                              </div>
+
+                              {/* Acciones */}
+                              <div className="flex items-center gap-2 self-end sm:self-center flex-shrink-0">
+                                {/* Reordenar */}
+                                <div className="flex items-center border border-slate-800 rounded-lg overflow-hidden bg-slate-900">
+                                  <button
+                                    type="button"
+                                    onClick={() => handleMoveProject(idx, -1)}
+                                    disabled={idx === 0}
+                                    className="p-1.5 text-slate-400 hover:text-white disabled:opacity-30 hover:bg-slate-800"
+                                    title="Subir orden"
+                                  >
+                                    <ChevronUp className="w-3.5 h-3.5" />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleMoveProject(idx, 1)}
+                                    disabled={idx === configDraft.featuredProjects.length - 1}
+                                    className="p-1.5 text-slate-400 hover:text-white disabled:opacity-30 hover:bg-slate-800"
+                                    title="Bajar orden"
+                                  >
+                                    <ChevronDown className="w-3.5 h-3.5" />
+                                  </button>
+                                </div>
+
+                                {/* Botón Editar */}
+                                <button
+                                  type="button"
+                                  onClick={() => handleStartEditProject(proj)}
+                                  className="p-2 rounded-lg bg-slate-900 hover:bg-slate-800 text-cyan-400 hover:text-cyan-300 border border-slate-800 transition-colors"
+                                  title="Editar proyecto"
+                                >
+                                  <Edit3 className="w-3.5 h-3.5" />
+                                </button>
+
+                                {/* Botón Eliminar */}
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteProject(proj.id)}
+                                  className="p-2 rounded-lg bg-slate-900 hover:bg-slate-800 text-rose-400 hover:text-rose-300 border border-slate-800 transition-colors"
+                                  title="Quitar de destacados"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+
+                                {/* Switch Visibilidad */}
+                                <div className="flex items-center gap-1.5 pl-2 border-l border-slate-800">
+                                  <span className={`text-[11px] font-mono font-semibold ${isVisible ? 'text-emerald-400' : 'text-slate-500'}`}>
+                                    {isVisible ? 'On' : 'Off'}
+                                  </span>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleToggleProject(proj.id)}
+                                    className={`w-10 h-5 rounded-full transition-colors relative ${
+                                      isVisible ? 'bg-emerald-500' : 'bg-slate-800'
+                                    }`}
+                                  >
+                                    <div className={`w-4 h-4 rounded-full bg-white transition-transform ${
+                                      isVisible ? 'translate-x-5.5' : 'translate-x-0.5'
+                                    }`} />
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </>
+                  )}
+
                 </div>
               )}
 
-              {/* TAB 2: GITHUB API & LISTA NEGRA */}
+              {/* ========================================================= */}
+              {/* TAB 2: GITHUB API & LISTA NEGRA                           */}
+              {/* ========================================================= */}
               {activeTab === 'github' && (
                 <div className="space-y-4">
                   <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-between">
@@ -456,7 +909,7 @@ export default function AdminModal({ isOpen, onClose, activeConfig, onConfigUpda
                     <div className="flex items-center justify-between mb-2">
                       <div>
                         <h4 className="text-sm font-bold text-white">Todos los Repositorios de GitHub ({liveRepos.length})</h4>
-                        <p className="text-xs text-slate-400">Enciende o apaga cuáles repositorios deseas que aparezcan en el portafolio público.</p>
+                        <p className="text-xs text-slate-400">Enciende o apaga repositorios, o conviértelos en Proyectos Destacados.</p>
                       </div>
                       <span className="text-xs font-mono text-cyan-400 bg-cyan-950 px-2 py-1 rounded border border-cyan-800/40">
                         {liveRepos.filter(r => !(configDraft.github.hiddenRepos || []).some(h => h.toLowerCase() === r.name.toLowerCase())).length} activos
@@ -484,17 +937,34 @@ export default function AdminModal({ isOpen, onClose, activeConfig, onConfigUpda
                               )}
                             </div>
 
-                            <div className="flex items-center gap-3">
-                              <span className={`text-xs font-mono ${isVisible ? 'text-cyan-400 font-semibold' : 'text-slate-500'}`}>
-                                {isVisible ? 'Mostrar' : 'Oculto'}
-                              </span>
+                            <div className="flex items-center gap-2">
+                              {/* Botón Destacar */}
                               <button
                                 type="button"
-                                onClick={() => handleToggleHiddenRepo(repo.name)}
-                                className={`w-10 h-5 rounded-full transition-colors relative ${isVisible ? 'bg-cyan-500' : 'bg-slate-800'}`}
+                                onClick={() => {
+                                  setActiveTab('projects');
+                                  handleStartNewProject(repo);
+                                }}
+                                className="px-2 py-1 rounded bg-slate-900 hover:bg-slate-800 text-amber-400 hover:text-amber-300 border border-amber-500/20 text-[11px] font-semibold flex items-center gap-1 transition-colors"
+                                title="Promover a Proyecto Destacado"
                               >
-                                <div className={`w-4 h-4 rounded-full bg-white transition-transform ${isVisible ? 'translate-x-5.5' : 'translate-x-0.5'}`} />
+                                <Star className="w-3 h-3 fill-amber-400" />
+                                <span>Destacar</span>
                               </button>
+
+                              {/* Toggle Visible */}
+                              <div className="flex items-center gap-2 pl-2 border-l border-slate-800">
+                                <span className={`text-xs font-mono ${isVisible ? 'text-cyan-400 font-semibold' : 'text-slate-500'}`}>
+                                  {isVisible ? 'Mostrar' : 'Oculto'}
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => handleToggleHiddenRepo(repo.name)}
+                                  className={`w-10 h-5 rounded-full transition-colors relative ${isVisible ? 'bg-cyan-500' : 'bg-slate-800'}`}
+                                >
+                                  <div className={`w-4 h-4 rounded-full bg-white transition-transform ${isVisible ? 'translate-x-5.5' : 'translate-x-0.5'}`} />
+                                </button>
+                              </div>
                             </div>
                           </div>
                         );
@@ -504,7 +974,9 @@ export default function AdminModal({ isOpen, onClose, activeConfig, onConfigUpda
                 </div>
               )}
 
-              {/* TAB 3: PERFIL & DATOS DE CONTACTO */}
+              {/* ========================================================= */}
+              {/* TAB 3: PERFIL & DATOS DE CONTACTO                         */}
+              {/* ========================================================= */}
               {activeTab === 'profile' && (
                 <div className="space-y-5">
                   <div className="p-4 rounded-2xl bg-cyan-950/30 border border-cyan-800/40">
@@ -526,7 +998,7 @@ export default function AdminModal({ isOpen, onClose, activeConfig, onConfigUpda
                         value={configDraft.personal.email || ''}
                         onChange={(e) => setConfigDraft(prev => ({ ...prev, personal: { ...prev.personal, email: e.target.value } }))}
                         className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-xs text-white focus:outline-none focus:border-cyan-500 font-mono"
-                        placeholder="ejemplo@correo.com"
+                        placeholder="williamfraile.trabajo@gmail.com"
                       />
                     </div>
 
@@ -619,7 +1091,9 @@ export default function AdminModal({ isOpen, onClose, activeConfig, onConfigUpda
                 </div>
               )}
 
-              {/* TAB 4: PUBLICAR GLOBAL & EXPORTAR */}
+              {/* ========================================================= */}
+              {/* TAB 4: PUBLICAR GLOBAL & EXPORTAR                         */}
+              {/* ========================================================= */}
               {activeTab === 'export' && (
                 <div className="space-y-6">
                   
@@ -796,7 +1270,9 @@ export default function AdminModal({ isOpen, onClose, activeConfig, onConfigUpda
                 </div>
               )}
 
-              {/* TAB 5: SEGURIDAD */}
+              {/* ========================================================= */}
+              {/* TAB 5: SEGURIDAD                                          */}
+              {/* ========================================================= */}
               {activeTab === 'security' && (
                 <div className="max-w-md mx-auto py-4 space-y-4">
                   <div className="text-center mb-4">
