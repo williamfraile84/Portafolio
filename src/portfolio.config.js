@@ -13,7 +13,7 @@ export const portfolioConfig = {
     shortName: "William Fraile",
     title: "Ingeniero de Sistemas · Full Stack Developer · Seguridad & Auditoría de Software",
     bio: "Graduado de la Universidad de los Llanos y tecnólogo del SENA. Especializado en arquitecturas web modernas con React 19 y FastAPI, bases de datos SQL (PostgreSQL, SQLite WAL) e integración de hardware/automatización con Python. Aporto un valor diferencial único respaldado por proyectos de auditoría pericial forense y ciberseguridad bajo estándares OWASP Top 10 e ISO 25010.",
-    email: "williamfraile84@gmail.com",
+    email: "williamfraile.trabajo@gmail.com",
     phone: "(+57) 314 383 9318",
     whatsappUrl: "https://wa.me/573143839318",
     linkedinUrl: "https://www.linkedin.com/in/wyfb",

@@ -758,24 +758,7 @@ export default function AdminModal({ isOpen, onClose, activeConfig, onConfigUpda
                     )}
                   </div>
 
-                  {/* Tarjeta Secundaria: Guardar Local */}
-                  <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 flex items-center justify-between gap-4">
-                    <div>
-                      <h4 className="text-xs font-bold text-white">Opción Local: Guardar solo en este navegador</h4>
-                      <p className="text-[11px] text-slate-400">
-                        Útil para previsualizar los cambios en tu pantalla antes de publicarlos a nivel mundial.
-                      </p>
-                    </div>
-                    <button
-                      onClick={handleSaveToBrowser}
-                      className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-white font-semibold text-xs border border-slate-700 transition-colors flex items-center gap-1.5 flex-shrink-0"
-                    >
-                      <Save className="w-3.5 h-3.5 text-cyan-400" />
-                      <span>Guardar Local</span>
-                    </button>
-                  </div>
-
-                  {/* Tarjeta Terciaria: Descargar / Copiar Código */}
+                  {/* Respaldo Manual: Descargar / Copiar Código */}
                   <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800">
                     <h4 className="text-xs font-bold text-white mb-1">Respaldo Manual: Descargar o Copiar Código</h4>
                     <p className="text-[11px] text-slate-400 mb-3">
@@ -867,13 +850,6 @@ export default function AdminModal({ isOpen, onClose, activeConfig, onConfigUpda
                   className="px-4 py-2 rounded-xl bg-slate-800 text-slate-300 text-xs font-semibold hover:bg-slate-700"
                 >
                   Cerrar
-                </button>
-                <button
-                  onClick={handleSaveToBrowser}
-                  className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold border border-slate-700 flex items-center gap-1.5"
-                >
-                  <Save className="w-3.5 h-3.5 text-cyan-400" />
-                  <span>Guardar Local</span>
                 </button>
                 <button
                   onClick={handlePublishToGitHub}

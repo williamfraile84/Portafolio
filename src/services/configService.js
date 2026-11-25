@@ -12,6 +12,11 @@ export function loadActiveConfig() {
     if (!raw) return defaultConfig;
     const custom = JSON.parse(raw);
 
+    // Migración automática del correo antiguo al nuevo correo por defecto
+    if (custom.personal && (custom.personal.email === 'williamfraile84@gmail.com' || !custom.personal.email)) {
+      custom.personal.email = defaultConfig.personal.email;
+    }
+
     // Fusión recursiva segura
     return {
       personal: {
