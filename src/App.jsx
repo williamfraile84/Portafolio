@@ -22,12 +22,13 @@ export default function App() {
   // Admin Modal State
   const [adminOpen, setAdminOpen] = useState(false);
 
-  const loadData = async () => {
+  const loadData = async (overrideCfg = null) => {
     setLoading(true);
-    const activeCfg = loadActiveConfig();
+    const activeCfg = overrideCfg || loadActiveConfig();
     setConfig(activeCfg);
 
-    const data = await fetchGitHubData();
+    const hiddenList = activeCfg.github ? activeCfg.github.hiddenRepos : [];
+    const data = await fetchGitHubData(hiddenList);
     if (data.newRepos) {
       setNewRepos(data.newRepos);
     }
@@ -71,7 +72,7 @@ export default function App() {
 
   const handleConfigUpdated = (newConfig) => {
     setConfig(newConfig);
-    loadData();
+    loadData(newConfig);
   };
 
   return (
@@ -88,10 +89,11 @@ export default function App() {
           isLive={isLive} 
           lastSync={lastSync}
           onOpenAdmin={() => setAdminOpen(true)}
+          personal={config.personal}
         />
         
         <main className="pt-20">
-          <Hero />
+          <Hero personal={config.personal} />
           <About />
           <Skills />
           <ProjectsSection
@@ -99,13 +101,13 @@ export default function App() {
             newRepos={newRepos}
             isLive={isLive}
             lastSync={lastSync}
-            onRefresh={loadData}
+            onRefresh={() => loadData(config)}
           />
           <Experience />
-          <Contact />
+          <Contact personal={config.personal} />
         </main>
 
-        <Footer onOpenAdmin={() => setAdminOpen(true)} />
+        <Footer onOpenAdmin={() => setAdminOpen(true)} personal={config.personal} />
 
         {/* Modal de Control Secreto */}
         <AdminModal

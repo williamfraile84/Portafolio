@@ -1,16 +1,25 @@
 import React, { useState } from 'react';
 import { portfolioConfig } from '../portfolio.config';
-import { Mail, MessageCircle, Linkedin, Github, MapPin, Copy, Check } from 'lucide-react';
+import { Mail, MessageCircle, Linkedin, Github, Copy, Check } from 'lucide-react';
 
-export default function Contact() {
-  const { personal } = portfolioConfig;
+export default function Contact({ personal = portfolioConfig.personal }) {
   const [copied, setCopied] = useState(false);
 
   const handleCopyEmail = () => {
-    navigator.clipboard.writeText(personal.email);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    if (personal.email) {
+      navigator.clipboard.writeText(personal.email);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
   };
+
+  // Normalizar URL de WhatsApp si solo se suministra el número
+  const whatsappHref = personal.whatsappUrl || 
+    (personal.phone ? `https://wa.me/${personal.phone.replace(/\D/g, '')}` : 'https://wa.me/573143839318');
+
+  // Formato visual para mostrar links limpios
+  const linkedinDisplay = personal.linkedinUrl ? personal.linkedinUrl.replace(/^https?:\/\/(www\.)?/, '') : 'linkedin.com/in/wyfb';
+  const githubDisplay = personal.githubUrl ? personal.githubUrl.replace(/^https?:\/\/(www\.)?/, '') : 'github.com/williamfraile84';
 
   return (
     <section id="contacto" className="py-20 px-4 sm:px-6 lg:px-8 border-t border-slate-900 bg-slate-950/80">
@@ -29,7 +38,7 @@ export default function Contact() {
         </p>
 
         {/* Contact Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-12">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
           
           {/* Email */}
           <div className="glass-panel rounded-2xl p-5 flex flex-col items-center text-center group relative">
@@ -51,7 +60,7 @@ export default function Contact() {
 
           {/* WhatsApp */}
           <a
-            href={personal.whatsappUrl}
+            href={whatsappHref}
             target="_blank"
             rel="noreferrer"
             className="glass-panel rounded-2xl p-5 flex flex-col items-center text-center group hover:border-emerald-500/50 transition-all"
@@ -76,8 +85,8 @@ export default function Contact() {
               <Linkedin className="w-6 h-6" />
             </div>
             <div className="text-xs text-slate-400 mb-1">Perfil Profesional</div>
-            <div className="text-xs font-bold text-white group-hover:text-blue-400">
-              linkedin.com/in/wyfb
+            <div className="text-xs font-bold text-white group-hover:text-blue-400 truncate max-w-full">
+              {linkedinDisplay}
             </div>
           </a>
 
@@ -92,16 +101,11 @@ export default function Contact() {
               <Github className="w-6 h-6" />
             </div>
             <div className="text-xs text-slate-400 mb-1">Código & Repositorios</div>
-            <div className="text-xs font-bold text-white group-hover:text-purple-400">
-              github.com/williamfraile84
+            <div className="text-xs font-bold text-white group-hover:text-purple-400 truncate max-w-full">
+              {githubDisplay}
             </div>
           </a>
 
-        </div>
-
-        <div className="inline-flex items-center gap-2 text-xs font-mono text-slate-400 bg-slate-900/90 px-4 py-2 rounded-full border border-slate-800">
-          <MapPin className="w-3.5 h-3.5 text-cyan-400" />
-          <span>{personal.location}</span>
         </div>
 
       </div>

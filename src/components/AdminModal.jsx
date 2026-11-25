@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Lock, Unlock, KeyRound, Eye, EyeOff, Save, Download, Copy, RotateCcw, 
-  X, Check, AlertTriangle, ShieldCheck, Github, Sliders, User, RefreshCw, Plus, Trash2
+  X, Check, AlertTriangle, ShieldCheck, Github, Sliders, User, RefreshCw, Plus, Trash2, Mail, MessageCircle, Linkedin,
+  Globe, Send, ExternalLink, Loader2, Key
 } from 'lucide-react';
 import { isAuthenticated, login, logout, changePassword } from '../services/authService';
 import { saveActiveConfig, resetConfigToDefaults, downloadConfigFile, generateConfigCode } from '../services/configService';
+import { getSavedGitHubToken, saveGitHubToken, clearGitHubToken, publishConfigToGitHub } from '../services/githubPublishService';
 
 export default function AdminModal({ isOpen, onClose, activeConfig, onConfigUpdated, liveRepos = [] }) {
   const [authed, setAuthed] = useState(false);
@@ -22,6 +24,12 @@ export default function AdminModal({ isOpen, onClose, activeConfig, onConfigUpda
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
 
+  // GitHub Direct Publishing State
+  const [githubToken, setGithubToken] = useState(getSavedGitHubToken());
+  const [showToken, setShowToken] = useState(false);
+  const [isPublishing, setIsPublishing] = useState(false);
+  const [publishFeedback, setPublishFeedback] = useState(null);
+
   useEffect(() => {
     if (isOpen) {
       setAuthed(isAuthenticated());
@@ -29,6 +37,8 @@ export default function AdminModal({ isOpen, onClose, activeConfig, onConfigUpda
       setPassword('');
       setLoginError('');
       setStatusMsg({ text: '', type: '' });
+      setPublishFeedback(null);
+      setGithubToken(getSavedGitHubToken());
     }
   }, [isOpen, activeConfig]);
 
@@ -59,7 +69,6 @@ export default function AdminModal({ isOpen, onClose, activeConfig, onConfigUpda
     setConfigDraft((prev) => {
       const updated = prev.featuredProjects.map((p) => {
         if (p.id === projId) {
-          // Si está explícitamente en false, poner true; si es true o undefined, poner false
           const isCurrentlyVisible = p.visible !== false;
           return { ...p, visible: !isCurrentlyVisible };
         }
@@ -69,10 +78,10 @@ export default function AdminModal({ isOpen, onClose, activeConfig, onConfigUpda
     });
   };
 
-  // Toggle visibilidad de repo de GitHub en lista negra / oculta
+  // Toggle visibilidad de repo de GitHub en lista oculta
   const handleToggleHiddenRepo = (repoName) => {
     setConfigDraft((prev) => {
-      const hiddenList = [...prev.github.hiddenRepos];
+      const hiddenList = [...(prev.github.hiddenRepos || [])];
       const index = hiddenList.findIndex((r) => r.toLowerCase() === repoName.toLowerCase());
       if (index >= 0) {
         hiddenList.splice(index, 1); // Quitar de ocultos (hacerlo visible)
@@ -81,109 +90,153 @@ export default function AdminModal({ isOpen, onClose, activeConfig, onConfigUpda
       }
       return {
         ...prev,
-        github: { ...prev.github, hiddenRepos: hiddenList }
+        github: {
+          ...prev.github,
+          hiddenRepos: hiddenList
+        }
       };
     });
   };
 
-  // Guardar cambios en el navegador
+  // Guardar en navegador (localStorage) y notificar al estado reactivo principal
   const handleSaveToBrowser = () => {
     const res = saveActiveConfig(configDraft);
     if (res.success) {
       onConfigUpdated(configDraft);
-      showFlash("¡Configuración guardada exitosamente en este navegador!", "success");
+      setStatusMsg({ text: '¡Configuración guardada en este navegador con éxito!', type: 'success' });
+      setTimeout(() => setStatusMsg({ text: '', type: '' }), 4000);
     } else {
-      showFlash("Error al guardar: " + res.error, "error");
+      setStatusMsg({ text: 'Error al guardar en el navegador: ' + res.error, type: 'error' });
     }
   };
 
-  // Restablecer por defecto
+  // Publicar directamente en GitHub Pages para todo el mundo
+  const handlePublishToGitHub = async () => {
+    if (!githubToken || !githubToken.trim()) {
+      setActiveTab('export');
+      setPublishFeedback({
+        success: false,
+        message: 'Ingresa tu Personal Access Token (PAT) de GitHub para poder publicar a nivel global.'
+      });
+      return;
+    }
+
+    setIsPublishing(true);
+    setPublishFeedback(null);
+
+    // 1. Guardar primero en local
+    saveActiveConfig(configDraft);
+    onConfigUpdated(configDraft);
+
+    // 2. Publicar en GitHub
+    const res = await publishConfigToGitHub(configDraft, githubToken);
+    setIsPublishing(false);
+    setPublishFeedback(res);
+
+    if (res.success) {
+      setStatusMsg({ 
+        text: '¡Cambios subidos a GitHub con éxito! El despliegue automático global ha iniciado.', 
+        type: 'success' 
+      });
+    } else {
+      setStatusMsg({ text: res.message, type: 'error' });
+    }
+  };
+
+  const handleSaveTokenOnly = () => {
+    saveGitHubToken(githubToken);
+    setStatusMsg({ text: 'Token de GitHub guardado en este navegador de forma segura.', type: 'success' });
+    setTimeout(() => setStatusMsg({ text: '', type: '' }), 3000);
+  };
+
+  const handleClearTokenOnly = () => {
+    clearGitHubToken();
+    setGithubToken('');
+    setStatusMsg({ text: 'Token de GitHub eliminado de este navegador.', type: 'success' });
+    setTimeout(() => setStatusMsg({ text: '', type: '' }), 3000);
+  };
+
+  // Cambiar contraseña maestra
+  const handleChangePassword = async (e) => {
+    e.preventDefault();
+    if (newPassword !== confirmPassword) {
+      setStatusMsg({ text: 'Las contraseñas no coinciden.', type: 'error' });
+      return;
+    }
+    const res = await changePassword(newPassword);
+    if (res.success) {
+      setStatusMsg({ text: 'Contraseña actualizada exitosamente.', type: 'success' });
+      setNewPassword('');
+      setConfirmPassword('');
+      setTimeout(() => setStatusMsg({ text: '', type: '' }), 4000);
+    } else {
+      setStatusMsg({ text: res.message, type: 'error' });
+    }
+  };
+
+  // Restablecer valores de fábrica
   const handleResetDefaults = () => {
-    if (window.confirm("¿Seguro que deseas restablecer la configuración a los valores originales de portfolio.config.js?")) {
-      const restored = resetConfigToDefaults();
-      setConfigDraft(restored);
-      onConfigUpdated(restored);
-      showFlash("Configuración restablecida a los valores de fábrica.", "success");
+    if (window.confirm("¿Seguro que deseas restablecer todos los ajustes a los valores iniciales?")) {
+      const def = resetConfigToDefaults();
+      setConfigDraft(def);
+      onConfigUpdated(def);
+      setStatusMsg({ text: 'Configuración restablecida a valores originales.', type: 'success' });
     }
   };
 
-  // Copiar código generado
+  // Copiar código para portfolio.config.js
   const handleCopyCode = () => {
     const code = generateConfigCode(configDraft);
     navigator.clipboard.writeText(code);
-    showFlash("Código de portfolio.config.js copiado al portapapeles.", "success");
+    setStatusMsg({ text: '¡Código copiado al portapapeles! Reemplaza src/portfolio.config.js en tu repo.', type: 'success' });
+    setTimeout(() => setStatusMsg({ text: '', type: '' }), 4000);
   };
 
   // Descargar archivo
   const handleDownloadFile = () => {
     downloadConfigFile(configDraft);
-    showFlash("Descargando portfolio.config.js...", "success");
-  };
-
-  // Cambio de contraseña
-  const handleChangePassword = async (e) => {
-    e.preventDefault();
-    if (newPassword !== confirmPassword) {
-      showFlash("Las contraseñas no coinciden.", "error");
-      return;
-    }
-    const res = await changePassword(newPassword);
-    if (res.success) {
-      showFlash(res.message, "success");
-      setNewPassword('');
-      setConfirmPassword('');
-    } else {
-      showFlash(res.message, "error");
-    }
-  };
-
-  const showFlash = (text, type = 'success') => {
-    setStatusMsg({ text, type });
+    setStatusMsg({ text: 'Archivo portfolio.config.js descargado.', type: 'success' });
     setTimeout(() => setStatusMsg({ text: '', type: '' }), 4000);
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/90 backdrop-blur-md flex items-center justify-center p-3 sm:p-6 animate-fade-in overflow-y-auto">
-      
-      {/* Container Card */}
-      <div className="w-full max-w-4xl bg-slate-900 border border-slate-800 rounded-3xl shadow-2xl overflow-hidden flex flex-col my-auto max-h-[92vh]">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-fadeIn">
+      <div className="relative w-full max-w-4xl max-h-[90vh] bg-slate-900 border border-slate-800 rounded-3xl shadow-2xl overflow-hidden flex flex-col">
         
         {/* ========================================================= */}
-        {/* VISTA 1: PANTALLA DE LOGIN DE SEGURIDAD                    */}
+        {/* VISTA 1: FORMULARIO DE ACCESO (LOGIN)                     */}
         {/* ========================================================= */}
         {!authed ? (
-          <div className="p-8 sm:p-12 flex flex-col items-center text-center max-w-md mx-auto">
-            <div className="w-16 h-16 rounded-2xl bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 flex items-center justify-center mb-6 shadow-xl shadow-cyan-500/10">
+          <div className="p-8 sm:p-12 text-center max-w-md mx-auto my-auto">
+            <div className="w-16 h-16 rounded-2xl bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 flex items-center justify-center mx-auto mb-6 shadow-lg shadow-cyan-500/10">
               <Lock className="w-8 h-8" />
             </div>
 
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-cyan-950/80 border border-cyan-800/50 text-cyan-300 text-xs font-mono font-semibold mb-3">
-              <ShieldCheck className="w-3.5 h-3.5" />
-              <span>Autenticación Criptográfica SHA-256</span>
-            </div>
+            <span className="text-[11px] font-mono uppercase tracking-widest text-cyan-400 bg-cyan-950/60 border border-cyan-800/40 px-3 py-1 rounded-full">
+              Autenticación Criptográfica SHA-256
+            </span>
 
-            <h3 className="text-2xl font-extrabold text-white mb-2">
-              Panel Administrativo Secreto
+            <h3 className="text-2xl font-bold text-white mt-4 mb-2">
+              Panel Administrativo Privado
             </h3>
-            <p className="text-slate-400 text-xs sm:text-sm mb-6 leading-relaxed">
-              Ingresa tu contraseña maestra para activar, desactivar y gestionar los proyectos y repositorios visibles en tu portafolio.
+            <p className="text-xs text-slate-400 mb-8 leading-relaxed">
+              Ingresa tu contraseña maestra para activar, desactivar y gestionar los proyectos, repositorios e información de contacto visible en tu portafolio.
             </p>
 
-            <form onSubmit={handleLoginSubmit} className="w-full space-y-4">
+            <form onSubmit={handleLoginSubmit} className="space-y-4">
               <div className="relative">
-                <KeyRound className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
                 <input
-                  type={showPassword ? 'text' : 'password'}
-                  placeholder="Contraseña Maestra..."
+                  type={showPassword ? "text" : "password"}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-10 pr-10 py-3 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500 transition-colors"
+                  placeholder="Contraseña Maestra..."
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-cyan-500 transition-colors pr-12"
                   autoFocus
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 p-1"
                 >
                   {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
@@ -213,10 +266,6 @@ export default function AdminModal({ isOpen, onClose, activeConfig, onConfigUpda
                 </button>
               </div>
             </form>
-
-            <div className="mt-8 pt-4 border-t border-slate-800/80 text-[11px] text-slate-500 font-mono">
-              Contraseña inicial: <code className="text-cyan-400 bg-slate-950 px-1.5 py-0.5 rounded">WilliamAdmin2026!</code> o <code className="text-cyan-400 bg-slate-950 px-1.5 py-0.5 rounded">admin123</code>
-            </div>
           </div>
         ) : (
           /* ========================================================= */
@@ -232,13 +281,13 @@ export default function AdminModal({ isOpen, onClose, activeConfig, onConfigUpda
                 </div>
                 <div>
                   <h3 className="text-base sm:text-lg font-bold text-white flex items-center gap-2">
-                    <span>Panel de Control Secreto</span>
+                    <span>Panel de Control Privado</span>
                     <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-emerald-950 border border-emerald-800 text-emerald-400">
                       Modo Admin Activo
                     </span>
                   </h3>
                   <p className="text-xs text-slate-400">
-                    Gestiona la visibilidad de proyectos, sincronización con GitHub y configuraciones.
+                    Gestiona proyectos, repositorios y publicación global en GitHub Pages.
                   </p>
                 </div>
               </div>
@@ -299,7 +348,17 @@ export default function AdminModal({ isOpen, onClose, activeConfig, onConfigUpda
                     : 'text-slate-400 hover:text-white'
                 }`}
               >
-                👤 Perfil & Disponibilidad
+                👤 Perfil & Contacto
+              </button>
+              <button
+                onClick={() => setActiveTab('export')}
+                className={`px-4 py-2 text-xs font-semibold rounded-t-xl transition-all ${
+                  activeTab === 'export'
+                    ? 'bg-slate-800 text-cyan-400 border-t-2 border-cyan-400'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                🚀 Publicar Globalmente
               </button>
               <button
                 onClick={() => setActiveTab('security')}
@@ -310,16 +369,6 @@ export default function AdminModal({ isOpen, onClose, activeConfig, onConfigUpda
                 }`}
               >
                 🔒 Seguridad
-              </button>
-              <button
-                onClick={() => setActiveTab('export')}
-                className={`px-4 py-2 text-xs font-semibold rounded-t-xl transition-all ${
-                  activeTab === 'export'
-                    ? 'bg-slate-800 text-cyan-400 border-t-2 border-cyan-400'
-                    : 'text-slate-400 hover:text-white'
-                }`}
-              >
-                💾 Guardar & Exportar
               </button>
             </div>
 
@@ -404,17 +453,24 @@ export default function AdminModal({ isOpen, onClose, activeConfig, onConfigUpda
                   </div>
 
                   <div>
-                    <h4 className="text-sm font-bold text-white mb-1">Repositorios Detectados de GitHub</h4>
-                    <p className="text-xs text-slate-400 mb-3">Enciende o apaga cuáles repositorios deseas que aparezcan en el portafolio público.</p>
+                    <div className="flex items-center justify-between mb-2">
+                      <div>
+                        <h4 className="text-sm font-bold text-white">Todos los Repositorios de GitHub ({liveRepos.length})</h4>
+                        <p className="text-xs text-slate-400">Enciende o apaga cuáles repositorios deseas que aparezcan en el portafolio público.</p>
+                      </div>
+                      <span className="text-xs font-mono text-cyan-400 bg-cyan-950 px-2 py-1 rounded border border-cyan-800/40">
+                        {liveRepos.filter(r => !(configDraft.github.hiddenRepos || []).some(h => h.toLowerCase() === r.name.toLowerCase())).length} activos
+                      </span>
+                    </div>
 
-                    <div className="space-y-2">
+                    <div className="space-y-2 max-h-[380px] overflow-y-auto pr-1">
                       {liveRepos.map((repo) => {
-                        const isHidden = configDraft.github.hiddenRepos.some(r => r.toLowerCase() === repo.name.toLowerCase());
+                        const isHidden = (configDraft.github.hiddenRepos || []).some(r => r.toLowerCase() === repo.name.toLowerCase());
                         const isVisible = !isHidden;
                         return (
                           <div
                             key={repo.id || repo.name}
-                            className={`p-3 rounded-xl border flex items-center justify-between ${
+                            className={`p-3 rounded-xl border flex items-center justify-between transition-all ${
                               isVisible ? 'bg-slate-950 border-slate-800' : 'bg-slate-950/40 border-slate-900 opacity-50'
                             }`}
                           >
@@ -429,7 +485,7 @@ export default function AdminModal({ isOpen, onClose, activeConfig, onConfigUpda
                             </div>
 
                             <div className="flex items-center gap-3">
-                              <span className={`text-xs font-mono ${isVisible ? 'text-cyan-400' : 'text-slate-500'}`}>
+                              <span className={`text-xs font-mono ${isVisible ? 'text-cyan-400 font-semibold' : 'text-slate-500'}`}>
                                 {isVisible ? 'Mostrar' : 'Oculto'}
                               </span>
                               <button
@@ -448,61 +504,316 @@ export default function AdminModal({ isOpen, onClose, activeConfig, onConfigUpda
                 </div>
               )}
 
-              {/* TAB 3: PERFIL & DISPONIBILIDAD */}
+              {/* TAB 3: PERFIL & DATOS DE CONTACTO */}
               {activeTab === 'profile' && (
-                <div className="space-y-4">
+                <div className="space-y-5">
+                  <div className="p-4 rounded-2xl bg-cyan-950/30 border border-cyan-800/40">
+                    <h4 className="text-sm font-bold text-white mb-1">Información de Contacto y Enlaces Directos</h4>
+                    <p className="text-xs text-slate-400">
+                      Modifica tus canales oficiales aquí. Los cambios se actualizarán al instante en la sección de Contacto, Navegación y Pie de página.
+                    </p>
+                  </div>
+
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {/* Correo Electrónico */}
                     <div>
-                      <label className="text-xs font-bold text-slate-300 block mb-1">Nombre Completo</label>
-                      <input
-                        type="text"
-                        value={configDraft.personal.name}
-                        onChange={(e) => setConfigDraft(prev => ({ ...prev, personal: { ...prev.personal, name: e.target.value } }))}
-                        className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-xs font-bold text-slate-300 block mb-1">Correo Electrónico</label>
+                      <label className="text-xs font-bold text-slate-300 flex items-center gap-1.5 mb-1">
+                        <Mail className="w-3.5 h-3.5 text-cyan-400" />
+                        <span>Correo Electrónico</span>
+                      </label>
                       <input
                         type="email"
-                        value={configDraft.personal.email}
+                        value={configDraft.personal.email || ''}
                         onChange={(e) => setConfigDraft(prev => ({ ...prev, personal: { ...prev.personal, email: e.target.value } }))}
-                        className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white"
+                        className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-xs text-white focus:outline-none focus:border-cyan-500 font-mono"
+                        placeholder="ejemplo@correo.com"
                       />
                     </div>
+
+                    {/* WhatsApp / Celular Texto */}
                     <div>
-                      <label className="text-xs font-bold text-slate-300 block mb-1">Teléfono / WhatsApp</label>
+                      <label className="text-xs font-bold text-slate-300 flex items-center gap-1.5 mb-1">
+                        <MessageCircle className="w-3.5 h-3.5 text-emerald-400" />
+                        <span>WhatsApp / Celular (Texto Visible)</span>
+                      </label>
                       <input
                         type="text"
-                        value={configDraft.personal.phone}
+                        value={configDraft.personal.phone || ''}
                         onChange={(e) => setConfigDraft(prev => ({ ...prev, personal: { ...prev.personal, phone: e.target.value } }))}
-                        className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white"
+                        className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-xs text-white focus:outline-none focus:border-cyan-500 font-mono"
+                        placeholder="(+57) 314 383 9318"
                       />
                     </div>
+
+                    {/* Enlace WhatsApp Directo */}
                     <div>
-                      <label className="text-xs font-bold text-slate-300 block mb-1">Ubicación y Disponibilidad</label>
+                      <label className="text-xs font-bold text-slate-300 flex items-center gap-1.5 mb-1">
+                        <MessageCircle className="w-3.5 h-3.5 text-emerald-400" />
+                        <span>Enlace de WhatsApp (URL Directa)</span>
+                      </label>
+                      <input
+                        type="url"
+                        value={configDraft.personal.whatsappUrl || ''}
+                        onChange={(e) => setConfigDraft(prev => ({ ...prev, personal: { ...prev.personal, whatsappUrl: e.target.value } }))}
+                        className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-xs text-white focus:outline-none focus:border-cyan-500 font-mono"
+                        placeholder="https://wa.me/573143839318"
+                      />
+                    </div>
+
+                    {/* LinkedIn URL */}
+                    <div>
+                      <label className="text-xs font-bold text-slate-300 flex items-center gap-1.5 mb-1">
+                        <Linkedin className="w-3.5 h-3.5 text-blue-400" />
+                        <span>Perfil Profesional (LinkedIn URL)</span>
+                      </label>
+                      <input
+                        type="url"
+                        value={configDraft.personal.linkedinUrl || ''}
+                        onChange={(e) => setConfigDraft(prev => ({ ...prev, personal: { ...prev.personal, linkedinUrl: e.target.value } }))}
+                        className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-xs text-white focus:outline-none focus:border-cyan-500 font-mono"
+                        placeholder="https://www.linkedin.com/in/wyfb"
+                      />
+                    </div>
+
+                    {/* GitHub URL */}
+                    <div>
+                      <label className="text-xs font-bold text-slate-300 flex items-center gap-1.5 mb-1">
+                        <Github className="w-3.5 h-3.5 text-purple-400" />
+                        <span>Código & Repositorios (GitHub URL)</span>
+                      </label>
+                      <input
+                        type="url"
+                        value={configDraft.personal.githubUrl || ''}
+                        onChange={(e) => setConfigDraft(prev => ({ ...prev, personal: { ...prev.personal, githubUrl: e.target.value } }))}
+                        className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-xs text-white focus:outline-none focus:border-cyan-500 font-mono"
+                        placeholder="https://github.com/williamfraile84"
+                      />
+                    </div>
+
+                    {/* Nombre Completo */}
+                    <div>
+                      <label className="text-xs font-bold text-slate-300 flex items-center gap-1.5 mb-1">
+                        <User className="w-3.5 h-3.5 text-slate-400" />
+                        <span>Nombre Completo</span>
+                      </label>
                       <input
                         type="text"
-                        value={configDraft.personal.location}
-                        onChange={(e) => setConfigDraft(prev => ({ ...prev, personal: { ...prev.personal, location: e.target.value } }))}
-                        className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white"
+                        value={configDraft.personal.name || ''}
+                        onChange={(e) => setConfigDraft(prev => ({ ...prev, personal: { ...prev.personal, name: e.target.value } }))}
+                        className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-xs text-white focus:outline-none focus:border-cyan-500"
+                        placeholder="William Yovany Fraile Bautista"
                       />
                     </div>
                   </div>
 
+                  {/* Resumen Bio */}
                   <div>
                     <label className="text-xs font-bold text-slate-300 block mb-1">Resumen del Perfil (Bio)</label>
                     <textarea
                       rows="3"
-                      value={configDraft.personal.bio}
+                      value={configDraft.personal.bio || ''}
                       onChange={(e) => setConfigDraft(prev => ({ ...prev, personal: { ...prev.personal, bio: e.target.value } }))}
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-white leading-relaxed"
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-white leading-relaxed focus:outline-none focus:border-cyan-500"
                     />
                   </div>
                 </div>
               )}
 
-              {/* TAB 4: SEGURIDAD */}
+              {/* TAB 4: PUBLICAR GLOBAL & EXPORTAR */}
+              {activeTab === 'export' && (
+                <div className="space-y-6">
+                  
+                  {/* Tarjeta Principal: Publicación Directa en GitHub */}
+                  <div className="p-5 sm:p-6 rounded-2xl bg-gradient-to-br from-cyan-950/60 via-slate-900 to-blue-950/40 border border-cyan-800/60 shadow-xl relative overflow-hidden">
+                    <div className="flex items-start justify-between gap-4 mb-4">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 flex items-center justify-center">
+                          <Globe className="w-5 h-5" />
+                        </div>
+                        <div>
+                          <h4 className="text-base font-bold text-white flex items-center gap-2">
+                            <span>Publicar Globalmente en GitHub Pages</span>
+                            <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-cyan-950 border border-cyan-800 text-cyan-300">
+                              Permanente Mundial
+                            </span>
+                          </h4>
+                          <p className="text-xs text-slate-300">
+                            Guarda tus cambios directamente en tu repositorio de GitHub para que cualquier visitante en el mundo los vea de inmediato.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Input de GitHub Token */}
+                    <div className="space-y-3 mb-5">
+                      <div>
+                        <div className="flex items-center justify-between mb-1">
+                          <label className="text-xs font-bold text-slate-300 flex items-center gap-1.5">
+                            <Key className="w-3.5 h-3.5 text-cyan-400" />
+                            <span>GitHub Personal Access Token (PAT)</span>
+                          </label>
+                          <a
+                            href="https://github.com/settings/tokens/new?scopes=repo&description=Portafolio-Admin-AutoDeploy"
+                            target="_blank"
+                            rel="noreferrer"
+                            className="text-[11px] text-cyan-400 hover:text-cyan-300 flex items-center gap-1 underline"
+                          >
+                            <span>Generar Token en GitHub</span>
+                            <ExternalLink className="w-3 h-3" />
+                          </a>
+                        </div>
+                        <div className="relative">
+                          <input
+                            type={showToken ? "text" : "password"}
+                            value={githubToken}
+                            onChange={(e) => setGithubToken(e.target.value)}
+                            placeholder="ghp_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+                            className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-xs text-white focus:outline-none focus:border-cyan-500 font-mono pr-20"
+                          />
+                          <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
+                            <button
+                              type="button"
+                              onClick={() => setShowToken(!showToken)}
+                              className="p-1 text-slate-400 hover:text-white"
+                              title={showToken ? "Ocultar" : "Mostrar"}
+                            >
+                              {showToken ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                            </button>
+                            {githubToken && (
+                              <button
+                                type="button"
+                                onClick={handleClearTokenOnly}
+                                className="p-1 text-slate-500 hover:text-rose-400"
+                                title="Borrar token"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                        <p className="text-[11px] text-slate-400 mt-1">
+                          🔒 Se almacena únicamente en tu navegador (localStorage) y se utiliza para actualizar tu repositorio <code className="text-cyan-300 font-mono">williamfraile84/Portafolio</code>.
+                        </p>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={handleSaveTokenOnly}
+                          disabled={!githubToken}
+                          className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-[11px] font-semibold text-slate-300 border border-slate-700 transition-colors disabled:opacity-50"
+                        >
+                          Guardar Token en este Navegador
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Botón Principal de Publicación */}
+                    <button
+                      type="button"
+                      onClick={handlePublishToGitHub}
+                      disabled={isPublishing}
+                      className="w-full py-3.5 rounded-xl bg-gradient-to-r from-cyan-500 via-blue-600 to-indigo-600 hover:from-cyan-400 hover:to-indigo-500 text-white font-bold text-sm shadow-xl shadow-cyan-500/25 flex items-center justify-center gap-2 transition-all hover:scale-[1.01] active:scale-[0.99] disabled:opacity-60 disabled:cursor-not-allowed"
+                    >
+                      {isPublishing ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin text-white" />
+                          <span>Guardando en GitHub y desplegando a nivel mundial...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Send className="w-4 h-4 text-white" />
+                          <span>🚀 Publicar Cambios en GitHub (Permanente para Todo el Mundo)</span>
+                        </>
+                      )}
+                    </button>
+
+                    {/* Feedback de publicación */}
+                    {publishFeedback && (
+                      <div className={`mt-4 p-4 rounded-xl text-xs flex items-start gap-3 ${
+                        publishFeedback.success
+                          ? 'bg-emerald-950/80 border border-emerald-800/80 text-emerald-200'
+                          : 'bg-rose-950/80 border border-rose-800/80 text-rose-200'
+                      }`}>
+                        {publishFeedback.success ? (
+                          <Check className="w-5 h-5 text-emerald-400 flex-shrink-0 mt-0.5" />
+                        ) : (
+                          <AlertTriangle className="w-5 h-5 text-rose-400 flex-shrink-0 mt-0.5" />
+                        )}
+                        <div className="space-y-1">
+                          <p className="font-semibold">{publishFeedback.message}</p>
+                          {publishFeedback.commitUrl && (
+                            <a
+                              href={publishFeedback.commitUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="inline-flex items-center gap-1 text-cyan-300 underline font-mono text-[11px] mt-1"
+                            >
+                              <span>Ver commit en GitHub ({publishFeedback.commitSha})</span>
+                              <ExternalLink className="w-3 h-3" />
+                            </a>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Tarjeta Secundaria: Guardar Local */}
+                  <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 flex items-center justify-between gap-4">
+                    <div>
+                      <h4 className="text-xs font-bold text-white">Opción Local: Guardar solo en este navegador</h4>
+                      <p className="text-[11px] text-slate-400">
+                        Útil para previsualizar los cambios en tu pantalla antes de publicarlos a nivel mundial.
+                      </p>
+                    </div>
+                    <button
+                      onClick={handleSaveToBrowser}
+                      className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-white font-semibold text-xs border border-slate-700 transition-colors flex items-center gap-1.5 flex-shrink-0"
+                    >
+                      <Save className="w-3.5 h-3.5 text-cyan-400" />
+                      <span>Guardar Local</span>
+                    </button>
+                  </div>
+
+                  {/* Tarjeta Terciaria: Descargar / Copiar Código */}
+                  <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800">
+                    <h4 className="text-xs font-bold text-white mb-1">Respaldo Manual: Descargar o Copiar Código</h4>
+                    <p className="text-[11px] text-slate-400 mb-3">
+                      Puedes descargar directamente el archivo <code className="text-cyan-400 font-mono">portfolio.config.js</code> generado con tus ajustes.
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        onClick={handleDownloadFile}
+                        className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-white font-semibold text-xs border border-slate-700 transition-colors flex items-center gap-1.5"
+                      >
+                        <Download className="w-3.5 h-3.5 text-cyan-400" />
+                        <span>Descargar portfolio.config.js</span>
+                      </button>
+                      <button
+                        onClick={handleCopyCode}
+                        className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-white font-semibold text-xs border border-slate-700 transition-colors flex items-center gap-1.5"
+                      >
+                        <Copy className="w-3.5 h-3.5 text-emerald-400" />
+                        <span>Copiar Código</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Restablecer valores de fábrica */}
+                  <div className="pt-2 border-t border-slate-800 flex justify-end">
+                    <button
+                      onClick={handleResetDefaults}
+                      className="inline-flex items-center gap-1 text-xs text-rose-400 hover:text-rose-300 font-semibold"
+                    >
+                      <RotateCcw className="w-3.5 h-3.5" />
+                      <span>Restablecer Configuración a Valores de Fábrica</span>
+                    </button>
+                  </div>
+
+                </div>
+              )}
+
+              {/* TAB 5: SEGURIDAD */}
               {activeTab === 'security' && (
                 <div className="max-w-md mx-auto py-4 space-y-4">
                   <div className="text-center mb-4">
@@ -543,66 +854,14 @@ export default function AdminModal({ isOpen, onClose, activeConfig, onConfigUpda
                 </div>
               )}
 
-              {/* TAB 5: GUARDAR & EXPORTAR */}
-              {activeTab === 'export' && (
-                <div className="space-y-6">
-                  <div className="p-4 rounded-2xl bg-cyan-950/40 border border-cyan-800/50">
-                    <h4 className="text-sm font-bold text-white mb-1">Opción A: Guardar en este Navegador</h4>
-                    <p className="text-xs text-slate-300 mb-3">
-                      Aplica tus cambios de inmediato en tu sesión local de Chrome/Edge sin necesidad de recompilar.
-                    </p>
-                    <button
-                      onClick={handleSaveToBrowser}
-                      className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-cyan-500 text-white font-semibold text-xs hover:bg-cyan-400 transition-colors"
-                    >
-                      <Save className="w-4 h-4" />
-                      <span>Guardar Cambios Locales</span>
-                    </button>
-                  </div>
-
-                  <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800">
-                    <h4 className="text-sm font-bold text-white mb-1">Opción B: Descargar o Copiar Código (Para todo el mundo)</h4>
-                    <p className="text-xs text-slate-400 mb-4">
-                      Para que los cambios sean permanentes para cualquier visitante de tu GitHub Pages en todo el mundo, descarga o copia el código y reemplaza <code className="text-cyan-400 font-mono">src/portfolio.config.js</code> en tu repositorio.
-                    </p>
-                    <div className="flex flex-wrap gap-3">
-                      <button
-                        onClick={handleDownloadFile}
-                        className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-semibold text-xs border border-slate-700 transition-colors"
-                      >
-                        <Download className="w-4 h-4 text-cyan-400" />
-                        <span>Descargar portfolio.config.js</span>
-                      </button>
-                      <button
-                        onClick={handleCopyCode}
-                        className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-semibold text-xs border border-slate-700 transition-colors"
-                      >
-                        <Copy className="w-4 h-4 text-emerald-400" />
-                        <span>Copiar Código</span>
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="pt-2 border-t border-slate-800 flex justify-end">
-                    <button
-                      onClick={handleResetDefaults}
-                      className="inline-flex items-center gap-1 text-xs text-rose-400 hover:text-rose-300 font-semibold"
-                    >
-                      <RotateCcw className="w-3.5 h-3.5" />
-                      <span>Restablecer Configuración a Valores de Fábrica</span>
-                    </button>
-                  </div>
-                </div>
-              )}
-
             </div>
 
             {/* Footer de Acciones Rápidas */}
-            <div className="p-4 bg-slate-950 border-t border-slate-800 flex items-center justify-between">
+            <div className="p-4 bg-slate-950 border-t border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-3">
               <span className="text-[11px] font-mono text-slate-500">
-                Atajo de teclado para reabrir este panel: <kbd className="bg-slate-900 border border-slate-800 px-1.5 py-0.5 rounded text-cyan-400">Ctrl + Shift + A</kbd>
+                Panel Privado de Administración
               </span>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
                 <button
                   onClick={onClose}
                   className="px-4 py-2 rounded-xl bg-slate-800 text-slate-300 text-xs font-semibold hover:bg-slate-700"
@@ -611,10 +870,22 @@ export default function AdminModal({ isOpen, onClose, activeConfig, onConfigUpda
                 </button>
                 <button
                   onClick={handleSaveToBrowser}
-                  className="inline-flex items-center gap-1.5 px-5 py-2 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 text-white font-semibold text-xs shadow-lg shadow-cyan-500/20 hover:scale-102 transition-all"
+                  className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold border border-slate-700 flex items-center gap-1.5"
                 >
-                  <Save className="w-3.5 h-3.5" />
-                  <span>Aplicar Cambios</span>
+                  <Save className="w-3.5 h-3.5 text-cyan-400" />
+                  <span>Guardar Local</span>
+                </button>
+                <button
+                  onClick={handlePublishToGitHub}
+                  disabled={isPublishing}
+                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-semibold text-xs shadow-lg shadow-cyan-500/20 hover:scale-102 transition-all disabled:opacity-60"
+                >
+                  {isPublishing ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    <Send className="w-3.5 h-3.5" />
+                  )}
+                  <span>Publicar Globalmente</span>
                 </button>
               </div>
             </div>

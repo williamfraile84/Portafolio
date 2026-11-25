@@ -13,30 +13,37 @@ export const portfolioConfig = {
     shortName: "William Fraile",
     title: "Ingeniero de Sistemas · Full Stack Developer · Seguridad & Auditoría de Software",
     bio: "Graduado de la Universidad de los Llanos y tecnólogo del SENA. Especializado en arquitecturas web modernas con React 19 y FastAPI, bases de datos SQL (PostgreSQL, SQLite WAL) e integración de hardware/automatización con Python. Aporto un valor diferencial único respaldado por proyectos de auditoría pericial forense y ciberseguridad bajo estándares OWASP Top 10 e ISO 25010.",
-    location: "Villavicencio, Meta, Colombia (Disponible para Trabajo Remoto / Presencial / Híbrido · UTC-5)",
     email: "williamfraile84@gmail.com",
     phone: "(+57) 314 383 9318",
     whatsappUrl: "https://wa.me/573143839318",
     linkedinUrl: "https://www.linkedin.com/in/wyfb",
-    githubUrl: "https://github.com/williamfraile84",
-    resumeEsUrl: "https://github.com/williamfraile84/williamfraile84/raw/main/CV_William_Fraile_FullStack_ES.docx",
-    resumeEnUrl: "https://github.com/williamfraile84/williamfraile84/raw/main/Resume_William_Fraile_FullStack_EN.docx",
+    githubUrl: "https://github.com/williamfraile84"
   },
 
   github: {
     username: "williamfraile84",
-    autoSync: true, // Si es true, consulta en tiempo real los repositorios públicos de GitHub
-    // Repositorios que NO quieres mostrar en el portafolio (ej. forks, pruebas escolares o repos vacíos):
+    autoSync: true,
     hiddenRepos: [
-      "Sprint",
-      "Software1-OIRI",
-      "cliente_servidor",
-      "Cliente-Servidor",
-      "proyecto-final",
-      "williamfraile84",
-      "Portafolio" // Se excluye a sí mismo de la lista secundaria
+      "Portafolio"
     ]
   },
+
+  // Catálogo completo de repositorios públicos conocidos del usuario en GitHub
+  allKnownRepos: [
+    { name: "Auditoria-CNG-web", language: "JavaScript", description: "Portal interactivo para dictamen pericial informático y auditoría forense" },
+    { name: "Backend-Inventario", language: "Python", description: "API REST asíncrona FastAPI con persistencia dual SQLite WAL y PostgreSQL" },
+    { name: "Backend-Remisiones", language: "Python", description: "Servicios FastAPI para control de remisiones y almacenamiento multi-cloud" },
+    { name: "Cliente-Servidor", language: "Java", description: "Arquitectura cliente-servidor con sockets y concurrencia" },
+    { name: "cliente_servidor", language: "Java", description: "Implementación de comunicación distribuida en Java" },
+    { name: "Frontend-Inventario", language: "JavaScript", description: "SPA moderna para control de inventarios y facturación" },
+    { name: "Frontend-Remisiones", language: "JavaScript", description: "Interfaz interactiva para conciliación y gestión de remisiones" },
+    { name: "Fruver-POS", language: "Python", description: "Control de báscula serial, pesaje en tiempo real y automatización POS" },
+    { name: "HANZI-APP", language: "Kotlin", description: "App Android nativa con Jetpack Compose y OCR offline" },
+    { name: "Portafolio", language: "JavaScript", description: "Portafolio profesional en React 19 y Vite" },
+    { name: "proyecto-final", language: "Java", description: "Proyecto de ingeniería de software en Java" },
+    { name: "Software1-OIRI", language: "CSS", description: "Sistema y portal web institucional" },
+    { name: "Sprint", language: "HTML", description: "Desarrollo y prototipado ágil" }
+  ],
 
   // TUS 7 PROYECTOS PRINCIPALES (Curados con capturas reales y descripciones arquitectónicas)
   featuredProjects: [
@@ -199,7 +206,7 @@ export const portfolioConfig = {
       categoryLabel: "🛡️ Auditoría Forense & OWASP",
       repoUrl: "https://github.com/williamfraile84/Auditoria-CNG-web",
       companionRepoUrl: null,
-      liveUrl: "https://williamfraile84.github.io/Auditoria-CNG-web/",
+      liveUrl: null,
       description: "Portal interactivo para la divulgación del dictamen pericial informático de la plataforma Centro de Negocios Ganaderos. Estructurado en 4 pilares: Ciberseguridad OWASP Top 10, Telemetría en vivo, Integridad DBA SQL Server RCSI y Calidad ISO 25010 / CMMI.",
       techStack: ["JavaScript", "HTML5", "CSS3", "OWASP Top 10", "ISO/IEC 25010", "ISO 31000", "CMMI", "SQL Server RCSI", "Azure Functions"],
       architecture: [

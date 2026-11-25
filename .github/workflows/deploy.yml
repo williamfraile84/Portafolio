@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
   pages: write
   id-token: write
 
@@ -21,10 +21,12 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
+      - name: Checkout Repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-      - name: Set up Node
+      - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 20
@@ -33,17 +35,46 @@ jobs:
       - name: Install dependencies
         run: npm install
 
-      - name: Build
+      - name: Build Production Assets
         run: npm run build
 
+      # 1. Despliegue oficial GitHub Pages (Modo Actions)
       - name: Setup Pages
+        id: pages
+        continue-on-error: true
         uses: actions/configure-pages@v4
 
-      - name: Upload artifact
+      - name: Upload Pages Artifact
+        continue-on-error: true
         uses: actions/upload-pages-artifact@v3
         with:
           path: './dist'
 
-      - name: Deploy to GitHub Pages
+      - name: Deploy to GitHub Pages (Actions Environment)
         id: deployment
+        continue-on-error: true
         uses: actions/deploy-pages@v4
+
+      # 2. Despliegue en rama gh-pages (Fallback para Pages desde rama gh-pages)
+      - name: Deploy to gh-pages branch
+        continue-on-error: true
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git checkout -B gh-pages
+          rm -rf src assets .github
+          cp -rf dist/* .
+          touch .nojekyll
+          git add -A
+          git diff --staged --quiet || git commit -m "deploy: update gh-pages production bundle [skip ci]"
+          git push origin gh-pages --force
+
+      # 3. Sincronizacion de activos compilados en la raiz de main (Fallback para Pages desde main)
+      - name: Sync compiled assets to main root
+        continue-on-error: true
+        run: |
+          git checkout main
+          cp -rf dist/* .
+          touch .nojekyll
+          git add assets/ index.html 404.html .nojekyll
+          git diff --staged --quiet || (git commit -m "chore(dist): auto-sync compiled assets on main [skip ci]" && git push origin main)

@@ -1,10 +1,8 @@
 import React from 'react';
 import { portfolioConfig } from '../portfolio.config';
-import { ArrowDown, Mail, Download, Sparkles, Shield, Cpu, Layers } from 'lucide-react';
+import { ArrowDown, Mail, Github, Sparkles } from 'lucide-react';
 
-export default function Hero() {
-  const { personal } = portfolioConfig;
-
+export default function Hero({ personal = portfolioConfig.personal }) {
   return (
     <section id="inicio" className="min-h-[85vh] flex items-center justify-center px-4 sm:px-6 lg:px-8 py-12 relative">
       <div className="max-w-5xl mx-auto text-center flex flex-col items-center">
@@ -43,9 +41,9 @@ export default function Hero() {
             <Mail className="w-4 h-4 text-cyan-400" />
             <span>Contactar Directo</span>
           </a>
-          <a href={personal.resumeEsUrl} className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-slate-900/80 border border-slate-800 text-slate-200 font-semibold text-sm hover:border-emerald-500/50 hover:text-white transition-all">
-            <Download className="w-4 h-4 text-emerald-400" />
-            <span>Descargar CV (DOCX)</span>
+          <a href={personal.githubUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-slate-900/80 border border-slate-800 text-slate-200 font-semibold text-sm hover:border-purple-500/50 hover:text-white transition-all">
+            <Github className="w-4 h-4 text-purple-400" />
+            <span>GitHub Profile</span>
           </a>
         </div>
 
